@@ -2,6 +2,7 @@ package main
 
 import (
 	// "context"
+
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
@@ -10,61 +11,93 @@ import (
 	"io"
 	"log"
 	"os"
-	"strings"
 
 	shell "github.com/ipfs/go-ipfs-api"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
-	// Connect to your local IPFS deamon running in the background.
-
-	// Where your local node is running on localhost:5001
-	sh := shell.NewShell("localhost:5001")
-
-	// Get input for the file to be added to IPFS from the command line
-	filepath := os.Args[1]
-
-	// Read the file from the path provided
-	file_data, err := os.ReadFile(filepath)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	// Get the key
+	// // Get the key
 	key, err := os.ReadFile("key")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Encrypt the file data with the key
-	encrypted_data := Encrypt(key, file_data)
+	// Where your local node is running on localhost:5001
+	sh := shell.NewShell("localhost:5001")
 
-	// Add the encrypted file to IPFS
-	cid, err := sh.Add(strings.NewReader(string(encrypted_data)))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+	app := &cli.App{
+		Name:  "ipfs-go-encrypt",
+		Usage: "Upload and download encrypted files from IPFS",
+		Commands: []*cli.Command{
+			{
+				Name:    "upload",
+				Aliases: []string{"a"},
+				Usage:   "upload a file",
+				Action: func(cCtx *cli.Context) error {
+					// Get the file
+					file, err := os.ReadFile(cCtx.Args().First())
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					// Encrypt the file
+					encryptedFile := Encrypt(key, file)
+
+					// Upload the file
+					cid, err := sh.Add(bytes.NewReader(encryptedFile))
+
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					fmt.Println(cid)
+
+					return nil
+				},
+			},
+			{
+				Name:    "download",
+				Aliases: []string{"d"},
+				Usage:   "download a file",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "out",
+						Value: "out",
+						Usage: "output file",
+					},
+				},
+				Action: func(cCtx *cli.Context) error {
+					data, err := sh.Cat(cCtx.Args().First())
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error: %s", err)
+						os.Exit(1)
+					}
+
+					// Use a buffer to read the data from the reader
+					buf := new(bytes.Buffer)
+					buf.ReadFrom(data)
+
+					// Decrypt the data
+					decrypted := Decrypt(key, buf.Bytes())
+
+					// Write the data to the output file
+					err = os.WriteFile(cCtx.String("out"), decrypted, 0644)
+
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error: %s", err)
+						os.Exit(1)
+					}
+
+					return nil
+				},
+			},
+		},
 	}
-	fmt.Printf("added %s\n", cid)
 
-	// Get the encrypted file from IPFS
-	data, err := sh.Cat(cid)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %s", err)
-		os.Exit(1)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
 	}
-
-	// Use a buffer to read the data from the reader
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(data)
-	encrypted_string := buf.String()
-	fmt.Printf("encrypted data %s", encrypted_string)
-
-	// Decrypt the data
-	decrypted_data := Decrypt(key, buf.Bytes())
-
-	fmt.Printf("decrypted data %s", decrypted_data)
 }
 
 func Encrypt(key []byte, data []byte) []byte {
