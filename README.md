@@ -27,6 +27,6 @@ ipfs-go-encrypt keygen
 Run the script with the test file or your file of choice
 
 ```
-ipfs-go-encrypt upload --key=<private key> test.txt // uploads encrypted version & logs the cuid
+ipfs-go-encrypt upload --key=<private key> <file name> // uploads encrypted version & logs the cuid
 ipfs-go-encrypt download --key<private key> <cuid> // downloads & decrypts (optional --out flag for output file)
 ```
