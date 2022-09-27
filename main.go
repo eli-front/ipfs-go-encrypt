@@ -17,13 +17,9 @@ import (
 )
 
 func main() {
-	// // Get the key
-	key, err := os.ReadFile("key")
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// Where your local node is running on localhost:5001
+
 	sh := shell.NewShell("localhost:5001")
 
 	app := &cli.App{
@@ -34,12 +30,22 @@ func main() {
 				Name:    "upload",
 				Aliases: []string{"a"},
 				Usage:   "upload a file",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "key",
+						Value:    "key",
+						Usage:    "encyrption key (use aes-128)",
+						Required: true,
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
 					// Get the file
 					file, err := os.ReadFile(cCtx.Args().First())
 					if err != nil {
 						log.Fatal(err)
 					}
+
+					key := []byte(cCtx.String("key"))
 
 					// Encrypt the file
 					encryptedFile := Encrypt(key, file)
@@ -66,7 +72,14 @@ func main() {
 						Value: "out",
 						Usage: "output file",
 					},
+					&cli.StringFlag{
+						Name:     "key",
+						Value:    "key",
+						Usage:    "encyrption key (use aes-128)",
+						Required: true,
+					},
 				},
+
 				Action: func(cCtx *cli.Context) error {
 					data, err := sh.Cat(cCtx.Args().First())
 					if err != nil {
@@ -78,6 +91,8 @@ func main() {
 					buf := new(bytes.Buffer)
 					buf.ReadFrom(data)
 
+					key := []byte(cCtx.String("key"))
+
 					// Decrypt the data
 					decrypted := Decrypt(key, buf.Bytes())
 
@@ -88,6 +103,22 @@ func main() {
 						fmt.Fprintf(os.Stderr, "error: %s", err)
 						os.Exit(1)
 					}
+
+					return nil
+				},
+			},
+			{
+				Name:    "keygen",
+				Aliases: []string{"k"},
+				Usage:   "generate a key",
+				Action: func(cCtx *cli.Context) error {
+					key := make([]byte, 16)
+					_, err := rand.Read(key)
+					if err != nil {
+						log.Fatal(err)
+					}
+
+					fmt.Println(string(key))
 
 					return nil
 				},
