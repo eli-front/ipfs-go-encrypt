@@ -118,7 +118,8 @@ func main() {
 						log.Fatal(err)
 					}
 
-					fmt.Println(string(key))
+					// format key to hex (base 16)
+					fmt.Printf("%x\n", key)
 
 					return nil
 				},
